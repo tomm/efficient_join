@@ -9,7 +9,7 @@ Gem::Specification.new do |spec|
   spec.email         = ["tomm8086@googlemail.com"]
 
   spec.summary       = %q{.}
-  spec.description   = %q{Very fast and memory-efficient way to join a list of ruby numbers.}
+  spec.description   = %q{Very fast and memory-efficient way to join ruby lists of numbers and strings.}
   spec.homepage      = "https://github.com/tomm/efficient_join"
   spec.license       = "MIT"
 
@@ -30,6 +30,6 @@ Gem::Specification.new do |spec|
   spec.extensions    = ["ext/efficient_join/extconf.rb"]
 
   spec.add_development_dependency "bundler", "~> 2.0"
-  spec.add_development_dependency "rake", "~> 10.0"
-  spec.add_development_dependency "rake-compiler"
+  spec.add_development_dependency "rake", "~> 12.3.3"
+  spec.add_development_dependency "rake-compiler", "~> 1.0"
 end
