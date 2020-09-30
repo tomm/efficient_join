@@ -1,6 +1,7 @@
 require 'efficient_join'
 require 'benchmark'
 require 'pg'
+require 'memory_profiler'
 
 RSpec.describe EfficientJoin, '#join' do
   it 'can handle bigint >= 2**61 and < 2**64' do
@@ -19,6 +20,10 @@ RSpec.describe EfficientJoin, '#join' do
     expect(
       EfficientJoin.join([])
     ).to eq ''
+
+    expect(
+      EfficientJoin.join(["some\x00null", "foo\x00bar"])
+    ).to eq "some\x00null,foo\x00bar"
 
     expect(
       EfficientJoin.join([2, 3, 4])
@@ -61,5 +66,52 @@ RSpec.describe EfficientJoin, '#join_pg_array' do
     join_speedup = array_join.total / effic_join.total
     puts "Speed up over PG::TextEncoder::Array.new.encode: #{join_speedup}"
     expect(join_speedup).to be > 2
+  end
+end
+
+RSpec.describe EfficientJoin, '#join_pg_array' do
+  it 'is faster than PG::TextEncoder::Array.new.encode' do
+    a = (0..4_000_000).to_a
+    b = (0..10_000).to_a
+
+    t = Time.now
+    m = MemoryProfiler.report do
+      EfficientJoin.join_pg_array(a)
+    end
+    puts "EfficientJoin: whole 4M allocated #{m.total_allocated} objects, used #{m.total_allocated_memsize / 1024**2} MiB, took #{Time.now - t} seconds"
+
+    t = Time.now
+    m = MemoryProfiler.report do
+      a.each_slice(1_000_000) do |slice|
+        EfficientJoin.join_pg_array(slice)
+        GC.start
+      end
+    end
+    puts "EfficientJoin: 4M in 1M batches allocated #{m.total_allocated} objects, used #{m.total_allocated_memsize / 1024**2} MiB, took #{Time.now - t} seconds"
+
+    t = Time.now
+    m = MemoryProfiler.report do
+      a.each_slice(10_000) do |slice|
+        EfficientJoin.join_pg_array(slice)
+        GC.start
+      end
+    end
+    puts "EfficientJoin: 4M in 10k batches allocated #{m.total_allocated} objects, used #{m.total_allocated_memsize / 1024**2} MiB, took #{Time.now - t} seconds"
+
+    t = Time.now
+    m = MemoryProfiler.report do
+      PG::TextEncoder::Array.new.encode(b)
+    end
+    puts "PG::TextEncoder::Array.new.encode: Single 10k batch  allocated #{m.total_allocated} objects, used #{m.total_allocated_memsize / 1024**2} MiB, took #{Time.now - t} seconds"
+
+    t = Time.now
+    m = MemoryProfiler.report do
+      a.each_slice(10_000) do |slice|
+        PG::TextEncoder::Array.new.encode(slice)
+        GC.start
+      end
+    end
+    puts "PG::TextEncoder::Array.new.encode: 4M in 10k batches allocated #{m.total_allocated} objects, used #{m.total_allocated_memsize / 1024**2} MiB, took #{Time.now - t} seconds"
+
   end
 end
